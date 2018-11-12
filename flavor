@@ -1,0 +1,233 @@
+#!/usr/bin/env perl
+use v5.15;
+use strict;
+use warnings;
+use autodie;
+use Cwd qw(abs_path);
+use List::Util qw(none any first);
+use File::Basename;
+use Getopt::Std;
+
+my $dir = dirname(abs_path($0));
+
+sub build {
+    my $options = pop @_;
+    my (@specified) = @_;
+
+    my @images = ();
+
+    if (!$options->{only}) {
+        @images = (@specified, get_dependencies(@specified, $options));
+    }
+    else {
+        @images = @specified;
+    }
+
+    my $graph = create_graph(@images, $options);
+
+    my @queue = keys %{$graph->{top}};
+    my %running = ();
+
+    while (scalar(@queue) > 0 or scalar(keys(%running)) > 0) {
+        if (scalar(keys(%running)) >= $options->{jobs} or (scalar(@queue) == 0 and scalar(keys(%running)) > 0)) {
+            my $pid = wait;
+            if (!$running{$pid}) {
+                next;
+            }
+
+            if ($? != 0) {
+                print 'ERROR: Failed running build for '.$running{$pid}." with exit code ".($? >> 8)."\n";
+            } else {
+                print "INFO: Finished build for $running{$pid}\n";
+                if (defined($graph->{dict}{$running{$pid}})) {
+                    my @add_queue = @{$graph->{dict}{$running{$pid}}};
+                    @queue = (@queue, @add_queue);
+                }
+            }
+
+            delete $running{$pid};
+            next;
+        }
+
+        if (my $job = shift @queue) {
+            print "INFO: Starting build for $job\n";
+            my $pid = fork;
+            if ($pid) {
+                $running{$pid} = $job;
+            }
+            else {
+                build_dockerfile("$dir/$job", $options->{repo} . "/${job}");
+                exit 1;
+            }
+        }
+    }
+
+    print "INFO: Done building!\n";
+}
+
+sub build_dockerfile {
+    my ($path, $tag) = @_;
+    exec "docker build -t $tag $path >/dev/null 2>/dev/null" or exit 1;
+}
+
+sub get_dependencies {
+    my $options = pop @_;
+    my (@specified) = @_;
+    my %dependencies = ();
+
+    while (my $image = shift @specified) {
+        my $parent = get_from($image) or next;
+
+        my ($repo, $name) = split '/', $parent, 2;
+
+        if ($options->{repo} ne $repo) {
+            next;
+        }
+
+        if ($options->{exclude}{$name}) {
+            next;
+        }
+
+        if (!-f "$dir/$name/Dockerfile") {
+            next;
+        }
+
+        if (!$dependencies{$name}) {
+            $dependencies{$name} = 1;
+            push @specified, $name;
+        }
+    }
+
+    return keys %dependencies;
+}
+
+sub get_from {
+    state %cache = ();
+    my ($image) = @_;
+
+    if (!exists $cache{$image}) {
+        my $dockerfile = "$dir/$image/Dockerfile";
+        if (!-f $dockerfile) {return undef;}
+        open(my $df, '<', $dockerfile) or return undef;
+        $cache{$image} = first {$_} map {
+            /^\s*FROM\s+(.*)\s*/;
+            $1
+        } <$df>;
+    }
+
+    return $cache{$image}
+}
+
+sub create_graph {
+    my $options = pop @_;
+    my (@images) = @_;
+
+    my %top = ();
+    my %dict = ();
+
+    for my $image (@images) {
+        my $parent = get_from($image);
+        my ($repo, $name) = split('/', $parent, 2) if $parent;
+
+        if (!$parent or $repo ne $options->{repo} or $options->{exclude}{$name} or !-f "$dir/$name/Dockerfile") {
+            $top{$image} = 1;
+        }
+        else {
+            if (!$dict{$name}) {
+                $dict{$name} = ();
+            }
+
+            push @{$dict{$name}}, ($image);
+        }
+    }
+
+    return {top => {%top}, dict => {%dict}};
+}
+
+sub usage() {
+    print <<'HELP'
+flavor [-h] [-r <repo>] [-x <images>] [-o] [-j <jobs>] [-p] [all|images...]
+
+Build Docker images with dependency graphing
+
+Options:
+    -x  Comma separated list of images not to rebuild in chain
+    -o  Only build given images, don't build parents
+    -r  Which repo or prefix to use, default: d.xr.to
+    -p  Push image after building
+    -j  How many builds should run at the same time, default: 4
+    -h  Show this help
+HELP
+}
+
+sub MAIN() {
+    my $repo = 'd.xr.to';
+    my $push = 0;
+    my $jobs = 4;
+    my $only = 0;
+    my %exclude = ();
+    my @images = ();
+    my %opts;
+
+    getopts('hr:x:opj:', \%opts);
+
+    if (scalar(@ARGV) < 1 || $opts{'h'}) {
+        usage;
+        exit;
+    }
+
+    if ($opts{'p'}) {
+        $push = 1;
+    }
+
+    if ($opts{'r'}) {
+        $repo = $opts{'r'};
+    }
+
+    if ($opts{'j'}) {
+        $jobs = $opts{'j'};
+    }
+
+    if ($opts{'x'}) {
+        for (split(',', $opts{'x'})) {
+            $exclude{$_} = 1;
+        }
+    }
+
+    if ($opts{'o'}) {
+        $only = 1;
+    }
+
+    if (grep {$_ eq 'all'} @ARGV) {
+        if (scalar(@ARGV) > 1) {
+            print "ERROR: all and specific images given, either give all or a list of specific images\n";
+            exit 1;
+        }
+
+        if ($only) {
+            print "ERROR: -o and all are mutually exclusive\n";
+            exit 1;
+        }
+
+        @images = map {
+            /\/([^\/]+)\/Dockerfile/;
+            $1
+        } <$dir/*/Dockerfile>;
+
+        @images = grep {not $exclude{$_}} @images;
+    }
+    else {
+        @images = (@ARGV);
+
+        if (any {$exclude{$_}} @images) {
+            print "ERROR: Asked to exclude an image that's also specified to build\n";
+            exit 1;
+        }
+    }
+
+    print "INFO: building: " . join(', ', @images) . "\n";
+
+    build @images, { only => $only, exclude => { %exclude }, repo => $repo, jobs => $jobs };
+}
+
+MAIN;
