@@ -46,3 +46,6 @@ INFO: Done building!
 
 - Support `img` in flavor
 - Add more containers (duh.)
+- Implement -p in flavor
+- Add CI to auto-publish images
+- Add -c flag to rebuild children of given images
