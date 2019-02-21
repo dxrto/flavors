@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+set -e;
+
+readonly WORKDIR="/_workdir"
+# Install base utils required for downloading latest void packages and running xbps-src
+xbps-install -Sy xtools base-devel chroot-git chroot-util-linux tar wget coreutils
+
+# Clone void-packages into workdir, with depth 1, as template history is irrelevant
+git clone --depth 1 'https://github.com/void-linux/void-packages.git' "${WORKDIR}";
+cd "${WORKDIR}";
+
+# Copy fakedchroot chroot style into chroot-style dir and make it executable
+cp /_fakedchroot.sh "${WORKDIR}/common/chroot-style/fakedchroot.sh";
+chmod a+x "${WORKDIR}/common/chroot-style/fakedchroot.sh";
+
+# If masterdir exists: remove it, because we will replace it with a symlink
+if [ -d "${WORKDIR}/masterdir" ]; then
+  rm "${WORKDIR}/masterdir";
+fi
+# Make $WORKDIR/masterdir point to /
+ln -s / "${WORKDIR}/masterdir";
+
+# Tell xbps-src to used our new chroot style: fakedchroot
+echo XBPS_CHROOT_CMD=fakedchroot >> etc/conf;
+
+# Tell xbps-src we init'd the chroot
+touch "${WORKDIR}/masterdir/.xbps_chroot_init"
+
+# Since base-chroot has some conflicts with a normal base, replace the check with true
+sed -i 's:check_installed_pkg base-chroot-0.1_1:true:' common/xbps-src/shutils/common.sh
+
+# Install the non-conflicting dependencies of base-chroot anyway
+xbps-install -Sy $(xbps-query -Rx base-chroot | grep -v 'bash\|texinfo');
+
+# Clean up cache
+rm -rf /var/cache/xbps/*;
