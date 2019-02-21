@@ -1,4 +1,4 @@
-FROM dxrto/base
+FROM d.xr.to/base
 LABEL authors="krageon <krageon@gmail.com>"
 RUN xbps-install -Sy umurmur && xbps-remove -Oo
 
