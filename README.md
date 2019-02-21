@@ -41,7 +41,7 @@ INFO: Done building!
 |php|`docker pull d.xr.to/php`||PHP, with composer installed and the following extensions: bz2, curl, gettext, gmp, openssl, pdo_mysql, pdo_sqlite, zip, and phar||
 |php-fpm|`docker pull d.xr.to/php-fpm`||`d.xr.to/php` with an php-fpm server running on port 9000||
 |nginx|`docker pull d.xr.to/nginx`|[README](nginx/)|A simple pre-configured nginx with safe defaults||
-|umurmur|`docker pull d.xr.to/umurmur`||Simple umurmur container|[krageon](/krageon)|
+|umurmur|`docker pull d.xr.to/umurmur`||Simple umurmur container|[krageon](https://github.com/krageon)|
 |jre|`docker pull d.xr.to/jre`||Container with latest JRE (based on glibc)||
 
 # Todo
