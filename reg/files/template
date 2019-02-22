@@ -1,0 +1,13 @@
+# Template file for 'grumble'
+pkgname=reg
+version=0.16.0
+revision=1
+short_desc="nada"
+build_style="go"
+go_import_path=github.com/genuinetools/reg
+go_package="${go_import_path}"
+license="BAD"
+homepage="https://github.com/mumble-voip/grumble"
+_branch="config"
+distfiles="https://github.com/genuinetools/reg/archive/v${version}.tar.gz"
+checksum="f2cc7625a7900d55244fa73741c2707bcd24b44e5d64d3e934e8884723191328"
