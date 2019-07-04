@@ -10,6 +10,7 @@ use Getopt::Std;
 use Data::Dumper;
 
 my $dir = dirname(abs_path($0));
+my $builder = "docker";
 
 sub build {
     my $options = pop @_;
@@ -80,7 +81,7 @@ sub build {
 
 sub build_dockerfile {
     my ($path, $tag, $job) = @_;
-    exec "docker build -t $tag $path > logs/$job.log 2>&1" or exit 1;
+    exec "$builder build -t $tag $path > logs/$job.log 2>&1" or exit 1;
 }
 
 sub get_dependencies {
@@ -140,7 +141,7 @@ sub create_graph {
     my %dict = ();
     my %parents = ();
 
-    for my $image (@images) {
+    while (my $image = shift @images) {
         my @curr_parents = get_from($image);
              print "DEBUG: $image depends on: " . join(" ", @curr_parents). "\n";
        my $is_top = 1;
@@ -151,7 +152,7 @@ sub create_graph {
               ;
           }
           else {
-                   $is_top = 0;
+              $is_top = 0;
               if (!$dict{$image}) {
                   $dict{$image} = ();
               }
@@ -163,6 +164,7 @@ sub create_graph {
               }
 
               push @{$parents{$name}}, ($image);
+	      push @images, ($name);
           }
         }
 
@@ -187,6 +189,7 @@ Options:
     -r  Which repo or prefix to use, default: d.xr.to
     -p  Push image after building
     -j  How many builds should run at the same time, default: 4
+    -i  Use img instead of docker
     -h  Show this help
 HELP
 }
@@ -201,7 +204,7 @@ sub MAIN() {
     my @images = ();
     my %opts;
 
-    getopts('hr:x:opj:n', \%opts);
+    getopts('hr:x:opj:ni', \%opts);
 
     if (scalar(@ARGV) < 1 || $opts{'h'}) {
         usage;
@@ -232,6 +235,10 @@ sub MAIN() {
 
     if ($opts{'o'}) {
         $only = 1;
+    }
+
+    if ($opts{'i'}) {
+        $builder = 'img';
     }
 
     if (grep {$_ eq 'all'} @ARGV) {
@@ -267,7 +274,7 @@ sub MAIN() {
 
     if ($push) {
 	for my $item (@succ) {
-	  system "docker push $repo/$item"
+	  system "$builder push $repo/$item"
         }
     }
 }
