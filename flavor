@@ -4,9 +4,10 @@ use strict;
 use warnings;
 use autodie;
 use Cwd qw(abs_path);
-use List::Util qw(none any first);
+use List::Util qw(none any first all);
 use File::Basename;
 use Getopt::Std;
+use Data::Dumper;
 
 my $dir = dirname(abs_path($0));
 
@@ -26,6 +27,7 @@ sub build {
     my $graph = create_graph(@images, $options);
 
     my @queue = keys %{$graph->{top}};
+    my @done = ();
     my %running = ();
 
     while (scalar(@queue) > 0 or scalar(keys(%running)) > 0) {
@@ -39,9 +41,15 @@ sub build {
                 print 'ERROR: Failed running build for '.$running{$pid}." with exit code ".($? >> 8)."\n";
             } else {
                 print "INFO: Finished build for $running{$pid}\n";
-                if (defined($graph->{dict}{$running{$pid}})) {
-                    my @add_queue = @{$graph->{dict}{$running{$pid}}};
-                    @queue = (@queue, @add_queue);
+                my $curr = $running{$pid};
+                push @done, ($curr);
+                if (defined($graph->{parents}{$curr})) {
+                    for my $dependee (@{$graph->{parents}{$curr}}) {
+                    my $inp = 0;
+                      if (all {$inp=$_; any {$inp eq $_} @done} @{$graph->{dict}{$dependee}}) {
+                        @queue = (@queue, ($dependee));
+                      }
+                    }
                 }
             }
 
@@ -51,23 +59,28 @@ sub build {
 
         if (my $job = shift @queue) {
             print "INFO: Starting build for $job\n";
+
             my $pid = fork;
             if ($pid) {
                 $running{$pid} = $job;
             }
             else {
-                build_dockerfile("$dir/$job", $options->{repo} . "/${job}");
+              if ($options->{noop}) {
+                exit 0;
+              }
+                build_dockerfile("$dir/$job", $options->{repo} . "/${job}", $job);
                 exit 1;
             }
         }
     }
 
     print "INFO: Done building!\n";
+    return @done;
 }
 
 sub build_dockerfile {
-    my ($path, $tag) = @_;
-    exec "docker build -t $tag $path >/dev/null 2>/dev/null" or exit 1;
+    my ($path, $tag, $job) = @_;
+    exec "docker build -t $tag $path > logs/$job.log 2>&1" or exit 1;
 }
 
 sub get_dependencies {
@@ -109,13 +122,14 @@ sub get_from {
         my $dockerfile = "$dir/$image/Dockerfile";
         if (!-f $dockerfile) {return undef;}
         open(my $df, '<', $dockerfile) or return undef;
-        $cache{$image} = first {$_} map {
-            /^\s*FROM\s+(.*)\s*/;
+        my @res = grep {$_} map {
+            /^\s*FROM\s+([A-Za-z0-9\.\-_\/]+)(\s*AS.*)?\s*/;
             $1
         } <$df>;
+       $cache{$image} = \@res
     }
 
-    return $cache{$image}
+    return @{$cache{$image}}
 }
 
 sub create_graph {
@@ -124,24 +138,40 @@ sub create_graph {
 
     my %top = ();
     my %dict = ();
+    my %parents = ();
 
     for my $image (@images) {
-        my $parent = get_from($image);
-        my ($repo, $name) = split('/', $parent, 2) if $parent;
+        my @curr_parents = get_from($image);
+             print "DEBUG: $image depends on: " . join(" ", @curr_parents). "\n";
+       my $is_top = 1;
+           for my $parent (@curr_parents) {
+          my ($repo, $name) = split('/', $parent, 2) if $parent;
 
-        if (!$parent or $repo ne $options->{repo} or $options->{exclude}{$name} or !-f "$dir/$name/Dockerfile") {
-            $top{$image} = 1;
+          if (!$parent or $repo ne $options->{repo} or $options->{exclude}{$name} or !-f "$dir/$name/Dockerfile") {
+              ;
+          }
+          else {
+                   $is_top = 0;
+              if (!$dict{$image}) {
+                  $dict{$image} = ();
+              }
+
+              push @{$dict{$image}}, ($name);
+
+              if (!$parents{$name}) {
+                  $parents{$name} = ()
+              }
+
+              push @{$parents{$name}}, ($image);
+          }
         }
-        else {
-            if (!$dict{$name}) {
-                $dict{$name} = ();
-            }
 
-            push @{$dict{$name}}, ($image);
+        if ($is_top) {
+          $top{$image} = 1;
         }
     }
 
-    return {top => {%top}, dict => {%dict}};
+    return {top => {%top}, dict => {%dict}, parents => {%parents}};
 }
 
 sub usage() {
@@ -152,6 +182,7 @@ Build Docker images with dependency graphing
 
 Options:
     -x  Comma separated list of images not to rebuild in chain
+    -n  Noop, don't actually build.
     -o  Only build given images, don't build parents
     -r  Which repo or prefix to use, default: d.xr.to
     -p  Push image after building
@@ -165,11 +196,12 @@ sub MAIN() {
     my $push = 0;
     my $jobs = 4;
     my $only = 0;
+    my $noop = 0;
     my %exclude = ();
     my @images = ();
     my %opts;
 
-    getopts('hr:x:opj:', \%opts);
+    getopts('hr:x:opj:n', \%opts);
 
     if (scalar(@ARGV) < 1 || $opts{'h'}) {
         usage;
@@ -178,6 +210,10 @@ sub MAIN() {
 
     if ($opts{'p'}) {
         $push = 1;
+    }
+
+    if ($opts{'n'}) {
+       $noop = 1;
     }
 
     if ($opts{'r'}) {
@@ -212,7 +248,7 @@ sub MAIN() {
         @images = map {
             /\/([^\/]+)\/Dockerfile/;
             $1
-        } <$dir/*/Dockerfile>;
+        } <$dir/*"/Dockerfile">;
 
         @images = grep {not $exclude{$_}} @images;
     }
@@ -227,7 +263,13 @@ sub MAIN() {
 
     print "INFO: building: " . join(', ', @images) . "\n";
 
-    build @images, { only => $only, exclude => { %exclude }, repo => $repo, jobs => $jobs };
+    my @succ = build @images, { noop => $noop, only => $only, exclude => { %exclude }, repo => $repo, jobs => $jobs };
+
+    if ($push) {
+	for my $item (@succ) {
+	  system "docker push $repo/$item"
+        }
+    }
 }
 
 MAIN;
