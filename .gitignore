@@ -1,2 +1,4 @@
 _Deparsed_XSubs.pm
 /.idea/
+logs/*
+!logs/.gitkeep
