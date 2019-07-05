@@ -1,0 +1,12 @@
+#!/usr/bin/bash
+set -e
+
+cd /_workdir;
+
+echo "Updating srcpkgs";
+git checkout .;
+git pull --ff;
+echo "Fixing fakedchroot";
+/opt/dxrto/setup-fakedchroot --fix;
+echo "Running build";
+./xbps-src pkg "$@";

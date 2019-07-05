@@ -1,5 +1,4 @@
 FROM d.xr.to/base:glibc
-COPY files/fakedchroot.sh /_fakedchroot.sh
-COPY files/setup-fakedchroot.sh /
-RUN bash /setup-fakedchroot.sh && rm /setup-fakedchroot.sh
+COPY files/* /opt/dxrto/
+RUN chmod a+x /opt/dxrto/setup-fakedchroot /opt/dxrto/fakedchroot.sh /opt/dxrto/xbps-build && /opt/dxrto/setup-fakedchroot && ln -s /opt/dxrto/xbps-build /bin/xbps-build
 WORKDIR '/_workdir'

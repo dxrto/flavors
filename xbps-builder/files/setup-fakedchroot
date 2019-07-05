@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-
 set -e;
+
+if [ "$1" == "--fix" ]; then
+  sed -i 's:check_installed_pkg base-chroot-0.1_1:true:' common/xbps-src/shutils/common.sh;
+  exit $?
+fi
 
 readonly WORKDIR="/_workdir"
 # Install base utils required for downloading latest void packages and running xbps-src
@@ -11,8 +15,7 @@ git clone --depth 1 'https://github.com/void-linux/void-packages.git' "${WORKDIR
 cd "${WORKDIR}";
 
 # Copy fakedchroot chroot style into chroot-style dir and make it executable
-cp /_fakedchroot.sh "${WORKDIR}/common/chroot-style/fakedchroot.sh";
-chmod a+x "${WORKDIR}/common/chroot-style/fakedchroot.sh";
+ln -s /opt/dxrto/fakedchroot.sh "${WORKDIR}/common/chroot-style/fakedchroot.sh";
 
 # If masterdir exists: remove it, because we will replace it with a symlink
 if [ -d "${WORKDIR}/masterdir" ]; then
