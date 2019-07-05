@@ -30,6 +30,7 @@ sub build {
     my @queue = keys %{$graph->{top}};
     my @done = ();
     my %running = ();
+    my %running_by_name = ();
 
     while (scalar(@queue) > 0 or scalar(keys(%running)) > 0) {
         if (scalar(keys(%running)) >= $options->{jobs} or (scalar(@queue) == 0 and scalar(keys(%running)) > 0)) {
@@ -37,24 +38,29 @@ sub build {
             if (!$running{$pid}) {
                 next;
             }
+            my $curr = $running{$pid};
 
             if ($? != 0) {
                 print 'ERROR: Failed running build for '.$running{$pid}." with exit code ".($? >> 8)."\n";
             } else {
                 print "INFO: Finished build for $running{$pid}\n";
-                my $curr = $running{$pid};
                 push @done, ($curr);
                 if (defined($graph->{parents}{$curr})) {
                     for my $dependee (@{$graph->{parents}{$curr}}) {
-                    my $inp = 0;
-                      if (all {$inp=$_; any {$inp eq $_} @done} @{$graph->{dict}{$dependee}}) {
-                        @queue = (@queue, ($dependee));
-                      }
-                    }
+                      my $inp = 0;
+                      if (defined($running_by_name{$dependee}) || any {$_ eq $dependee} (@done, @queue)) {
+			;
+		      } else {
+		        if (all {$inp=$_; any {$inp eq $_} @done} @{$graph->{dict}{$dependee}}) {
+		          @queue = (@queue, ($dependee));
+		        }
+		      }
+		    }
                 }
             }
 
             delete $running{$pid};
+	    delete $running_by_name{$curr};
             next;
         }
 
@@ -63,6 +69,7 @@ sub build {
 
             my $pid = fork;
             if ($pid) {
+		$running_by_name{$job} = $pid;
                 $running{$pid} = $job;
             }
             else {
@@ -81,6 +88,7 @@ sub build {
 
 sub build_dockerfile {
     my ($path, $tag, $job) = @_;
+    $job =~ s/\//./g;
     exec "$builder build -t $tag $path > logs/$job.log 2>&1" or exit 1;
 }
 
@@ -143,10 +151,13 @@ sub create_graph {
 
     while (my $image = shift @images) {
         my @curr_parents = get_from($image);
-             print "DEBUG: $image depends on: " . join(" ", @curr_parents). "\n";
-       my $is_top = 1;
-           for my $parent (@curr_parents) {
+        print "DEBUG: $image depends on: " . join(" ", @curr_parents). "\n";
+        my $is_top = 1;
+        for my $parent (@curr_parents) {
           my ($repo, $name) = split('/', $parent, 2) if $parent;
+	  if (defined($parents{$name}) || any {$name} @images) {
+            next;
+	  }
 
           if (!$parent or $repo ne $options->{repo} or $options->{exclude}{$name} or !-f "$dir/$name/Dockerfile") {
               ;
@@ -252,10 +263,10 @@ sub MAIN() {
             exit 1;
         }
 
-        @images = map {
-            /\/([^\/]+)\/Dockerfile/;
-            $1
-        } <$dir/*"/Dockerfile">;
+	 @images = map {
+            /\/([^\/]+(\/[^\/]+)*)\/Dockerfile/;
+            substr($1, length($dir))
+        } (<"$dir/*/Dockerfile">, <"$dir/*/*/Dockerfile">);
 
         @images = grep {not $exclude{$_}} @images;
     }
