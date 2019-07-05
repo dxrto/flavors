@@ -9,7 +9,6 @@ steps:
   commands:
     - img login -u "drone" -p "$PASSWORD" d.xr.to
     - ./flavor -ip all
-    - 'for i in ./logs/*; do echo "$i: "; cat $i; done;'
   environment:
     PASSWORD:
       from_secret: pass
