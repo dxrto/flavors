@@ -148,17 +148,15 @@ sub create_graph {
     my %top = ();
     my %dict = ();
     my %parents = ();
+    my %done = ();
 
     while (my $image = shift @images) {
+	$done{$image} = 1;
         my @curr_parents = get_from($image);
         print "DEBUG: $image depends on: " . join(" ", @curr_parents). "\n";
         my $is_top = 1;
         for my $parent (@curr_parents) {
           my ($repo, $name) = split('/', $parent, 2) if $parent;
-	  if (defined($parents{$name}) || any {$name} @images) {
-            next;
-	  }
-
           if (!$parent or $repo ne $options->{repo} or $options->{exclude}{$name} or !-f "$dir/$name/Dockerfile") {
               ;
           }
@@ -175,7 +173,10 @@ sub create_graph {
               }
 
               push @{$parents{$name}}, ($image);
-	      push @images, ($name);
+
+	      if (!defined($done{$name}) && !any {$name} @images) {
+	        push @images, ($name);
+              }
           }
         }
 
