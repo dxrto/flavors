@@ -1,0 +1,22 @@
+# Template file for 'grumble'
+pkgname=img
+version=0.5.7
+revision=1
+short_desc="xxx"
+build_style="go"
+depends="runc"
+go_import_path=github.com/genuinetools/img
+go_package="${go_import_path}"
+license="xxx"
+homepage="xxx"
+_branch="config"
+distfiles="https://github.com/genuinetools/img/archive/v${version}.tar.gz"
+checksum="d6a6fc254957cf60b4e0c212b2e8d1296afd1c2c7a852b265e067d788a61b0f7"
+
+do_build() {
+  make BUILDTAGS="seccomp noembed"
+}
+
+do_install() {
+  vbin img
+}
