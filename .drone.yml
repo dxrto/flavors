@@ -1,0 +1,19 @@
+---
+kind: pipeline
+name: default
+
+steps:
+- name: build
+  image: d.xr.to/eater/flavors
+  privileged: true
+  commands:
+    - img login -u "drone" -p "$PASSWORD" d.xr.to
+    - ./flavor -ip all
+    - 'for i in ./logs/*; do echo "$i: "; cat $i; done;'
+  environment:
+    PASSWORD:
+      from_secret: pass
+---
+kind: secret
+name: pass
+data: 'T9ClA+pnmeerZbyfePbfRy8aocEHWWDCZaE2DCgd00GMV89hWaiIKiDWjw=='
