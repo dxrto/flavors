@@ -289,6 +289,15 @@ sub MAIN() {
 	  system "$builder push $repo/$item"
         }
     }
+
+    my %image_done = ();
+    $image_done{$_} = 1 foreach (@succ);
+    my @missed = grep {!defined($image_done{$_})} @images;
+
+    if (@missed) {
+      print "Following images failed: ".join(" ", @missed)."\n";
+      exit 1;
+    }
 }
 
 MAIN;
