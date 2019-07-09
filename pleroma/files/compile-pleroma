@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+mix local.hex --force
+mix local.rebar --force
+mix deps.unlock tzdata
+mix deps.get
+mix compile

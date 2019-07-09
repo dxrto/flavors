@@ -5,5 +5,5 @@ ENV MIX_ENV=prod
 RUN git clone --depth 1 --branch v1.0.0 https://git.pleroma.social/pleroma/pleroma.git /app/pleroma
 WORKDIR /app/pleroma
 VOLUME /app/pleroma/uploads
-COPY files/run-pleroma /bin/run-pleroma
+COPY files/ /bin
 CMD /bin/run-pleroma
