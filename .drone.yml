@@ -12,7 +12,3 @@ steps:
   environment:
     PASSWORD:
       from_secret: pass
----
-kind: secret
-name: pass
-data: 'T9ClA+pnmeerZbyfePbfRy8aocEHWWDCZaE2DCgd00GMV89hWaiIKiDWjw=='
