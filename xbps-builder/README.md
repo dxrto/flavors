@@ -12,13 +12,10 @@ it in a target docker container looks like the following
 
 ```Dockerfile
 FROM d.xr.to/xbps-builder AS builder
-RUN git pull
-RUN ./xbps-src pkg docker
+RUN xbps-build docker
 FROM d.xr.to/base
 COPY --from=builder /_workdir/hostdir /tmp/xbps
-RUN xbps-install -SyR /tmp/xbps docker \
-      && xbps-remove -Oo \
-      && rm -rf /var/cache/xbps/* /tmp/xbps
+RUN xbps-local docker
 ```
 
 # Warning
