@@ -1,2 +1,2 @@
 FROM d.xr.to/base:glibc
-RUN  xbps-remote docker make
+RUN  xbps-remote docker make tar
