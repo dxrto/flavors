@@ -12,3 +12,28 @@ steps:
   environment:
     PASSWORD:
       from_secret: pass
+  volumes:
+  - name: logs
+    path: /drone/src/logs
+- name: upload logs
+  image: minio/mc
+  commands:
+    - mc config host add minio https://io.cijber.net "$ACCESS_KEY" "$SECRET_KEY"
+    - mc cp logs/* "minio/logs/$DRONE_REPO/$DRONE_BUILD_NUMBER/"
+    - 'echo "Logs can be found at: https://io.cijber.net/minio/logs/$DRONE_REPO/$DRONE_BUILD_NUMBER/"'
+  environment:
+    ACCESS_KEY:
+      from_secret: minio_access_key
+    SECRET_KEY:
+      from_secret: minio_secret_key
+  volumes:
+  - name: logs
+    path: /drone/src/logs
+  when:
+    status:
+    - failure
+
+volumes:
+- name: logs
+  temp: {}
+
