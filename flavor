@@ -44,6 +44,7 @@ sub build {
                 print 'ERROR: Failed running build for '.$running{$pid}." with exit code ".($? >> 8)."\n";
             } else {
                 print "INFO: Finished build for $running{$pid}\n";
+		sleep 1; # Make img catch up
                 push @done, ($curr);
                 if (defined($graph->{parents}{$curr})) {
                     for my $dependee (@{$graph->{parents}{$curr}}) {
