@@ -1,5 +1,5 @@
 FROM d.xr.to/base
-RUN xbps-install -Sy nginx
+RUN xbps-remote nginx
 RUN useradd -rU www -u 444
 RUN install -d -o www -g www /sites
 RUN chown -R www:www /var/tmp/nginx
