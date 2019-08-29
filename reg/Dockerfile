@@ -4,5 +4,5 @@ RUN xbps-build reg
 FROM d.xr.to/base:glibc AS main
 LABEL maintainer="=@eater.me"
 COPY --from=builder /_workdir/hostdir/binpkgs /tmp/xbps
-RUN xbps-local reg &&
+RUN xbps-local reg
 EXPOSE 8080/tcp
