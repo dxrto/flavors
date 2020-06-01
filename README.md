@@ -7,16 +7,18 @@ A repository of different types of containers based on `d.xr.to/base`, A list ca
 Building of images is done by `flavor` a simple perl5 tool which automatically creates a dependency graph of containers and runs the builds in parallel if possible.
 
 ```
-flavor [-h] [-r <repo>] [-x <images>] [-o] [-j <jobs>] [-p] [all|images...]
+flavor [-h] [-r <repo>] [-x <images>] [-o] [-j <jobs>] [-i] [-p] [all|images...]
 
 Build Docker images with dependency graphing
 
 Options:
     -x  Comma separated list of images not to rebuild in chain
+    -n  Noop, don't actually build.
     -o  Only build given images, don't build parents
     -r  Which repo or prefix to use, default: d.xr.to
     -p  Push image after building
     -j  How many builds should run at the same time, default: 4
+    -i  Use img instead of docker
     -h  Show this help
 ```
 

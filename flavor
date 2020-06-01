@@ -191,7 +191,7 @@ sub create_graph {
 
 sub usage() {
     print <<'HELP'
-flavor [-h] [-r <repo>] [-x <images>] [-o] [-j <jobs>] [-p] [all|images...]
+flavor [-h] [-r <repo>] [-x <images>] [-o] [-j <jobs>] [-i] [-p] [all|images...]
 
 Build Docker images with dependency graphing
 
